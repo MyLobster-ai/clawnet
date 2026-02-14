@@ -7,6 +7,7 @@ use futures_lite::StreamExt;
 use iroh_gossip::api::Event;
 
 use crate::config;
+use crate::discovery::DiscoveryListener;
 use crate::gossip;
 use crate::node::ClawNode;
 use crate::protocol::{self, BotAnnouncement, GossipMessage, PeerInfo, WireMessage, MSG_ALPN};
@@ -41,6 +42,39 @@ pub async fn run(interval_secs: u64) -> Result<()> {
     tracing::info!(node_id = %node_id, "daemon started");
     eprintln!("Daemon started. Node ID: {node_id}");
     eprintln!("Press Ctrl+C to stop.");
+
+    // Get QUIC port from iroh endpoint
+    let quic_port = node
+        .endpoint
+        .bound_sockets()
+        .next()
+        .map(|a| a.port())
+        .unwrap_or(0);
+
+    // Spawn discovery listener on well-known UDP port
+    let discovery_shutdown = Arc::new(AtomicBool::new(false));
+    let discovery_port = cfg.discovery_port;
+    match DiscoveryListener::bind(
+        discovery_port,
+        node_id.clone(),
+        cfg.name.clone(),
+        cfg.capabilities.clone(),
+        quic_port,
+        discovery_shutdown.clone(),
+    )
+    .await
+    {
+        Ok(listener) => {
+            eprintln!("Discovery listener on UDP port {discovery_port}");
+            tokio::spawn(async move {
+                listener.listen().await;
+            });
+        }
+        Err(e) => {
+            tracing::warn!("failed to start discovery listener: {e}");
+            eprintln!("Warning: could not bind discovery port {discovery_port}: {e}");
+        }
+    }
 
     let topic = gossip::subscribe(&node.gossip, vec![]).await?;
     let (sender, mut receiver) = topic.split();
@@ -89,6 +123,7 @@ pub async fn run(interval_secs: u64) -> Result<()> {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
                 eprintln!("\nShutting down...");
+                discovery_shutdown.store(true, Ordering::Relaxed);
                 // Send leave message
                 let leave = GossipMessage::Leave {
                     node_id: listen_node_id.clone(),

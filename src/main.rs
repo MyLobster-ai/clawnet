@@ -85,6 +85,14 @@ async fn run(args: cli::Cli) -> anyhow::Result<()> {
         Command::Status => {
             cli::status::run(json)?;
         }
+        Command::Scan {
+            range,
+            timeout,
+            concurrency,
+            port,
+        } => {
+            cli::scan::run(&range, timeout, concurrency, port, json).await?;
+        }
         Command::Beacon { action } => match action {
             BeaconAction::Register {
                 url,

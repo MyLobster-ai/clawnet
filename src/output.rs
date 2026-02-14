@@ -322,6 +322,7 @@ pub struct ConfigOutput {
     pub openclaw_version: Option<String>,
     pub mode: Option<String>,
     pub metadata: std::collections::HashMap<String, String>,
+    pub discovery_port: u16,
 }
 
 impl HumanDisplay for ConfigOutput {
@@ -340,11 +341,67 @@ impl HumanDisplay for ConfigOutput {
         if let Some(m) = &self.mode {
             println!("  mode: {m}");
         }
+        println!("  discovery_port: {}", self.discovery_port);
         if !self.metadata.is_empty() {
             println!("  metadata:");
             for (k, v) in &self.metadata {
                 println!("    {k}: {v}");
             }
         }
+    }
+}
+
+/// Scan output.
+#[derive(Serialize)]
+pub struct ScanOutput {
+    pub range: String,
+    pub results: Vec<ScanResultEntry>,
+    pub stats: ScanStatsOutput,
+}
+
+#[derive(Serialize)]
+pub struct ScanResultEntry {
+    pub ip: String,
+    pub node_id: String,
+    pub name: String,
+    pub version: String,
+    pub capabilities: Vec<String>,
+    pub quic_port: u16,
+    pub rtt_ms: f64,
+}
+
+#[derive(Serialize)]
+pub struct ScanStatsOutput {
+    pub total_ips: usize,
+    pub responses: usize,
+    pub duration_ms: u64,
+}
+
+impl HumanDisplay for ScanOutput {
+    fn human_print(&self) {
+        if self.results.is_empty() {
+            println!("No ClawNet bots found in {}", self.range);
+        } else {
+            println!(
+                "Found {} ClawNet bot(s):\n",
+                self.results.len()
+            );
+            for r in &self.results {
+                println!("  {} \u{2014} {} (v{})", r.ip, r.name, r.version);
+                println!("    NodeId: {}", r.node_id);
+                println!("    QUIC port: {}", r.quic_port);
+                if !r.capabilities.is_empty() {
+                    println!("    Capabilities: {}", r.capabilities.join(", "));
+                }
+                println!("    RTT: {:.1}ms", r.rtt_ms);
+                println!();
+            }
+        }
+        println!(
+            "Stats: {} probed, {} found, {:.1}s elapsed",
+            self.stats.total_ips,
+            self.stats.responses,
+            self.stats.duration_ms as f64 / 1000.0
+        );
     }
 }

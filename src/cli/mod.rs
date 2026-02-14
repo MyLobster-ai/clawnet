@@ -115,6 +115,24 @@ pub enum Command {
         #[command(subcommand)]
         action: BeaconAction,
     },
+
+    /// Scan IP ranges for ClawNet bots
+    Scan {
+        /// CIDR range (e.g. "192.168.1.0/24")
+        range: String,
+
+        /// Probe timeout in milliseconds
+        #[arg(long, default_value = "1000")]
+        timeout: u64,
+
+        /// Max concurrent probes
+        #[arg(long, default_value = "256")]
+        concurrency: usize,
+
+        /// Target port
+        #[arg(long, default_value = "19851")]
+        port: u16,
+    },
 }
 
 #[derive(clap::Subcommand)]
@@ -175,6 +193,7 @@ pub enum BeaconAction {
 
 pub mod announce;
 pub mod beacon;
+pub mod scan;
 pub mod chat;
 pub mod config_cmd;
 pub mod connect;

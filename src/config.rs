@@ -40,6 +40,10 @@ pub struct Config {
     /// Custom metadata key-value pairs
     #[serde(default)]
     pub metadata: std::collections::HashMap<String, String>,
+
+    /// UDP port for discovery probes (well-known port)
+    #[serde(default = "default_discovery_port")]
+    pub discovery_port: u16,
 }
 
 fn default_name() -> String {
@@ -58,6 +62,10 @@ fn default_discover_timeout() -> u64 {
     10
 }
 
+fn default_discovery_port() -> u16 {
+    19851
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -69,6 +77,7 @@ impl Default for Config {
             openclaw_version: None,
             mode: None,
             metadata: std::collections::HashMap::new(),
+            discovery_port: default_discovery_port(),
         }
     }
 }
@@ -141,6 +150,9 @@ pub fn set_value(key: &str, value: &str) -> Result<Config> {
         }
         "mode" => {
             config.mode = Some(value.to_string());
+        }
+        "discovery_port" => {
+            config.discovery_port = value.parse().context("invalid port number")?;
         }
         _ => {
             if let Some(cap_key) = key.strip_prefix("metadata.") {
