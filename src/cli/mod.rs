@@ -109,6 +109,12 @@ pub enum Command {
         #[command(subcommand)]
         action: ConfigAction,
     },
+
+    /// Interact with a ClawNet beacon registry
+    Beacon {
+        #[command(subcommand)]
+        action: BeaconAction,
+    },
 }
 
 #[derive(clap::Subcommand)]
@@ -145,7 +151,30 @@ pub enum ConfigAction {
     Reset,
 }
 
+#[derive(clap::Subcommand)]
+pub enum BeaconAction {
+    /// Register this bot with a beacon registry
+    Register {
+        /// Beacon URL (e.g. https://beacon.mylobster.ai)
+        #[arg(long)]
+        url: String,
+        /// Bot name to register
+        #[arg(long)]
+        name: Option<String>,
+        /// Comma-separated list of capabilities
+        #[arg(long, value_delimiter = ',')]
+        capabilities: Vec<String>,
+    },
+    /// Check beacon health/status
+    Status {
+        /// Beacon URL (e.g. https://beacon.mylobster.ai)
+        #[arg(long)]
+        url: String,
+    },
+}
+
 pub mod announce;
+pub mod beacon;
 pub mod chat;
 pub mod config_cmd;
 pub mod connect;

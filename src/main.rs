@@ -1,7 +1,7 @@
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use clawnet::cli::{self, Command, ConfigAction, FriendAction};
+use clawnet::cli::{self, BeaconAction, Command, ConfigAction, FriendAction};
 
 #[tokio::main]
 async fn main() {
@@ -85,6 +85,18 @@ async fn run(args: cli::Cli) -> anyhow::Result<()> {
         Command::Status => {
             cli::status::run(json)?;
         }
+        Command::Beacon { action } => match action {
+            BeaconAction::Register {
+                url,
+                name,
+                capabilities,
+            } => {
+                cli::beacon::register(&url, name, capabilities, json).await?;
+            }
+            BeaconAction::Status { url } => {
+                cli::beacon::status(&url, json).await?;
+            }
+        },
     }
     Ok(())
 }
