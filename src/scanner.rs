@@ -44,23 +44,40 @@ pub struct ScanStats {
 /// Maximum IPs allowed in a single scan (prevent accidental DoS).
 const MAX_SCAN_IPS: usize = 1_048_576; // /12 for IPv4
 
+/// Estimate host count from prefix length without iterating.
+fn estimate_host_count(net: &IpNet) -> u64 {
+    let host_bits = match net {
+        IpNet::V4(n) => 32 - n.prefix_len() as u64,
+        IpNet::V6(n) => 128 - n.prefix_len() as u64,
+    };
+    if host_bits == 0 {
+        1
+    } else if host_bits >= 64 {
+        u64::MAX
+    } else {
+        let total = 1u64 << host_bits;
+        if host_bits <= 1 { total } else { total.saturating_sub(2) }
+    }
+}
+
 /// Scan a CIDR range for ClawNet bots.
 pub async fn scan(range: &str, config: ScanConfig) -> Result<(Vec<ScanResult>, ScanStats)> {
     let net: IpNet = range.parse().context("invalid CIDR range")?;
 
-    let ips: Vec<IpAddr> = net.hosts().collect();
-    let total_ips = ips.len();
-
-    if total_ips == 0 {
+    // Check size before iterating to avoid OOM on huge ranges
+    let estimated = estimate_host_count(&net);
+    if estimated == 0 {
         anyhow::bail!("CIDR range contains no host addresses");
     }
-
-    if total_ips > MAX_SCAN_IPS {
+    if estimated > MAX_SCAN_IPS as u64 {
         anyhow::bail!(
-            "range too large: {total_ips} IPs (max {MAX_SCAN_IPS}). \
+            "range too large: ~{estimated} IPs (max {MAX_SCAN_IPS}). \
              Use a smaller CIDR prefix (e.g. /16 or smaller)"
         );
     }
+
+    let ips: Vec<IpAddr> = net.hosts().collect();
+    let total_ips = ips.len();
 
     let socket = Arc::new(
         UdpSocket::bind("0.0.0.0:0")
