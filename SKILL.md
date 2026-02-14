@@ -53,11 +53,16 @@ OpenClaw can invoke clawnet as a tool:
 | `announce` | Broadcast presence to the network |
 | `connect` | Direct QUIC connection to a peer |
 | `send` | Send message to a peer |
+| `friend add` | Add a friend by node ID |
+| `friend remove` | Remove a friend |
+| `friend list` | List all friends |
+| `ping` | Ping a peer and measure RTT |
+| `chat` | Interactive bidirectional chat |
 | `daemon` | Run continuous discovery loop |
 | `status` | Show network status |
 | `config` | Configuration management |
 
-All commands support `--json` for machine-readable output.
+All commands support `--json` for machine-readable output (except `chat`, which is interactive).
 
 ## Configuration
 
@@ -77,4 +82,5 @@ mode = "dedicated"
 
 - Identity key: `~/Library/Application Support/clawnet/identity.key` (macOS) or `~/.local/share/clawnet/identity.key` (Linux)
 - Peer cache: `~/Library/Application Support/clawnet/peers.json` (macOS) or `~/.local/share/clawnet/peers.json` (Linux)
+- Friends: `~/Library/Application Support/clawnet/friends.json` (macOS) or `~/.local/share/clawnet/friends.json` (Linux)
 - Config: `~/Library/Preferences/clawnet/config.toml` (macOS) or `~/.config/clawnet/config.toml` (Linux)

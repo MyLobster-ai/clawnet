@@ -3,7 +3,7 @@ use iroh::EndpointId;
 
 use crate::node::ClawNode;
 use crate::output::{self, SendOutput};
-use crate::protocol::{self, DirectMessage};
+use crate::protocol::{self, DirectMessage, WireMessage};
 
 pub async fn run(node_id_str: &str, message: &str, json: bool) -> Result<()> {
     let node = ClawNode::spawn().await?;
@@ -27,24 +27,16 @@ pub async fn run(node_id_str: &str, message: &str, json: bool) -> Result<()> {
         .await
         .context("failed to open bidirectional stream")?;
 
-    let msg = DirectMessage {
+    let msg = WireMessage::Text(DirectMessage {
         from: node.endpoint.id().to_string(),
         content: message.to_string(),
         timestamp: protocol::now_secs(),
-    };
+    });
 
     let bytes = msg.to_bytes();
     let bytes_len = bytes.len();
 
-    // Send length-prefixed message
-    send_stream
-        .write_all(&(bytes.len() as u32).to_be_bytes())
-        .await
-        .context("failed to send message length")?;
-    send_stream
-        .write_all(&bytes)
-        .await
-        .context("failed to send message")?;
+    protocol::write_length_prefixed(&mut send_stream, &bytes).await?;
     send_stream.finish().context("failed to finish stream")?;
 
     // Try to read response
@@ -74,14 +66,10 @@ pub async fn run(node_id_str: &str, message: &str, json: bool) -> Result<()> {
 }
 
 async fn read_response(recv: &mut iroh::endpoint::RecvStream) -> Result<String> {
-    let mut len_buf = [0u8; 4];
-    recv.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
-    if len > 1024 * 1024 {
-        anyhow::bail!("response too large");
+    let buf = protocol::read_length_prefixed(recv).await?;
+    let msg = WireMessage::from_bytes(&buf)?;
+    match msg {
+        WireMessage::Text(dm) => Ok(dm.content),
+        _ => anyhow::bail!("unexpected response type"),
     }
-    let mut buf = vec![0u8; len];
-    recv.read_exact(&mut buf).await?;
-    let msg = DirectMessage::from_bytes(&buf)?;
-    Ok(msg.content)
 }

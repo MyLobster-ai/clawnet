@@ -49,12 +49,50 @@ clawnet config set name "my-bot"
 clawnet config set announce_interval 30
 ```
 
+### Friends
+
+```bash
+# Add a friend
+clawnet friend add <node-id> --alias "bot1"
+
+# List friends
+clawnet friend list
+clawnet friend list --json
+
+# Remove a friend
+clawnet friend remove <node-id>
+```
+
+### Ping
+
+```bash
+# Ping a peer (default 4 pings)
+clawnet ping <node-id>
+
+# Custom count
+clawnet ping <node-id> -c 10
+
+# JSON output
+clawnet ping <node-id> --json
+```
+
+### Chat
+
+```bash
+# Interactive chat session (requires peer to run daemon)
+clawnet chat <node-id>
+# Type messages and press Enter. Ctrl+C to quit.
+```
+
 ## Architecture
 
 - **iroh Endpoint** — QUIC transport with Ed25519 identity, automatic NAT hole-punching, relay fallback
 - **iroh-gossip** — Epidemic broadcast tree overlay for announcing bot presence
 - **Peer Store** — Local JSON cache of discovered peers with TTL-based expiry
 - **Direct Messaging** — Length-prefixed messages over bidirectional QUIC streams (ALPN: `clawnet/msg/1`)
+- **Friends Store** — Local JSON-based friend list for managing known bots
+- **Ping** — RTT measurement over QUIC streams with standard ping-style output
+- **Chat** — Interactive bidirectional messaging over a single QUIC stream
 
 ## License
 

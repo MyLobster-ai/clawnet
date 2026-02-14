@@ -9,7 +9,7 @@ use iroh_gossip::api::Event;
 use crate::config;
 use crate::gossip;
 use crate::node::ClawNode;
-use crate::protocol::{self, BotAnnouncement, DirectMessage, GossipMessage, PeerInfo, MSG_ALPN};
+use crate::protocol::{self, BotAnnouncement, GossipMessage, PeerInfo, WireMessage, MSG_ALPN};
 use crate::store;
 
 /// Shared daemon state for status queries.
@@ -169,45 +169,88 @@ async fn accept_loop(endpoint: iroh::Endpoint, _state: Arc<DaemonState>) {
                 return;
             }
 
-            match connection.accept_bi().await {
-                Ok((mut send, mut recv)) => {
-                    // Read length-prefixed message
-                    let mut len_buf = [0u8; 4];
-                    if recv.read_exact(&mut len_buf).await.is_err() {
-                        return;
-                    }
-                    let len = u32::from_be_bytes(len_buf) as usize;
-                    if len > 1024 * 1024 {
-                        return;
-                    }
-                    let mut buf = vec![0u8; len];
-                    if recv.read_exact(&mut buf).await.is_err() {
-                        return;
-                    }
+            // Accept multiple streams per connection
+            loop {
+                let (mut send, mut recv) = match connection.accept_bi().await {
+                    Ok(streams) => streams,
+                    Err(_) => break, // connection closed
+                };
 
-                    if let Ok(msg) = DirectMessage::from_bytes(&buf) {
-                        tracing::info!(from = %msg.from, "received direct message");
-                        eprintln!(
-                            "Message from {}: {}",
-                            &msg.from[..16.min(msg.from.len())],
-                            msg.content
-                        );
+                let my_id = my_id.clone();
+                tokio::spawn(async move {
+                    let buf = match protocol::read_length_prefixed(&mut recv).await {
+                        Ok(b) => b,
+                        Err(_) => return,
+                    };
 
-                        // Send ack response
-                        let ack = DirectMessage {
-                            from: my_id.clone(),
-                            content: "received".to_string(),
-                            timestamp: protocol::now_secs(),
-                        };
-                        let ack_bytes = ack.to_bytes();
-                        let _ = send.write_all(&(ack_bytes.len() as u32).to_be_bytes()).await;
-                        let _ = send.write_all(&ack_bytes).await;
-                        let _ = send.finish();
+                    let msg = match WireMessage::from_bytes(&buf) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            tracing::debug!("failed to parse wire message: {e}");
+                            return;
+                        }
+                    };
+
+                    match msg {
+                        WireMessage::Text(dm) => {
+                            tracing::info!(from = %dm.from, "received direct message");
+                            eprintln!(
+                                "Message from {}: {}",
+                                &dm.from[..16.min(dm.from.len())],
+                                dm.content
+                            );
+                            // Send ack using WireMessage::Text
+                            let ack = WireMessage::Text(protocol::DirectMessage {
+                                from: my_id,
+                                content: "received".to_string(),
+                                timestamp: protocol::now_secs(),
+                            });
+                            let _ = protocol::write_length_prefixed(&mut send, &ack.to_bytes()).await;
+                            let _ = send.finish();
+                        }
+                        WireMessage::Ping { from, seq, timestamp } => {
+                            tracing::info!(from = %from, seq, "received ping");
+                            let pong = WireMessage::Pong {
+                                from: my_id,
+                                seq,
+                                echo_timestamp: timestamp,
+                                timestamp: protocol::now_secs(),
+                            };
+                            let _ = protocol::write_length_prefixed(&mut send, &pong.to_bytes()).await;
+                            let _ = send.finish();
+                        }
+                        WireMessage::Chat { from, content, .. } => {
+                            eprintln!(
+                                "[chat] {}: {}",
+                                &from[..16.min(from.len())],
+                                content
+                            );
+                            // Continue reading chat messages on this stream
+                            loop {
+                                match protocol::read_length_prefixed(&mut recv).await {
+                                    Ok(buf) => match WireMessage::from_bytes(&buf) {
+                                        Ok(WireMessage::Chat { from, content, .. }) => {
+                                            eprintln!(
+                                                "[chat] {}: {}",
+                                                &from[..16.min(from.len())],
+                                                content
+                                            );
+                                        }
+                                        Ok(WireMessage::ChatEnd { .. }) => break,
+                                        _ => break,
+                                    },
+                                    Err(_) => break,
+                                }
+                            }
+                        }
+                        WireMessage::ChatEnd { .. } => {
+                            // Stray ChatEnd, ignore
+                        }
+                        WireMessage::Pong { .. } => {
+                            // Only expected by ping initiator, ignore
+                        }
                     }
-                }
-                Err(e) => {
-                    tracing::debug!("failed to accept stream: {e}");
-                }
+                });
             }
         });
     }

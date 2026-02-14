@@ -1,7 +1,7 @@
 use clap::Parser;
 use tracing_subscriber::EnvFilter;
 
-use clawnet::cli::{self, Command, ConfigAction};
+use clawnet::cli::{self, Command, ConfigAction, FriendAction};
 
 #[tokio::main]
 async fn main() {
@@ -58,6 +58,23 @@ async fn run(args: cli::Cli) -> anyhow::Result<()> {
         }
         Command::Send { node_id, message } => {
             cli::send::run(&node_id, &message, json).await?;
+        }
+        Command::Friend { action } => match action {
+            FriendAction::Add { node_id, alias } => {
+                cli::friend::add(&node_id, alias.as_deref(), json)?;
+            }
+            FriendAction::Remove { node_id } => {
+                cli::friend::remove(&node_id, json)?;
+            }
+            FriendAction::List => {
+                cli::friend::list(json)?;
+            }
+        },
+        Command::Ping { node_id, count } => {
+            cli::ping::run(&node_id, count, json).await?;
+        }
+        Command::Chat { node_id } => {
+            cli::chat::run(&node_id).await?;
         }
         Command::Daemon {
             interval,

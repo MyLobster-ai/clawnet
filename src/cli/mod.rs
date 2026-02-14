@@ -79,6 +79,28 @@ pub enum Command {
         foreground: bool,
     },
 
+    /// Manage friends list
+    Friend {
+        #[command(subcommand)]
+        action: FriendAction,
+    },
+
+    /// Ping a peer and measure round-trip time
+    Ping {
+        /// Target node ID
+        node_id: String,
+
+        /// Number of pings to send
+        #[arg(short = 'c', default_value = "4")]
+        count: u32,
+    },
+
+    /// Interactive chat with a peer
+    Chat {
+        /// Target node ID
+        node_id: String,
+    },
+
     /// Show network and daemon status
     Status,
 
@@ -87,6 +109,25 @@ pub enum Command {
         #[command(subcommand)]
         action: ConfigAction,
     },
+}
+
+#[derive(clap::Subcommand)]
+pub enum FriendAction {
+    /// Add a friend by node ID
+    Add {
+        /// Node ID of the friend
+        node_id: String,
+        /// Optional alias for this friend
+        #[arg(long)]
+        alias: Option<String>,
+    },
+    /// Remove a friend
+    Remove {
+        /// Node ID to remove
+        node_id: String,
+    },
+    /// List all friends
+    List,
 }
 
 #[derive(clap::Subcommand)]
@@ -105,11 +146,14 @@ pub enum ConfigAction {
 }
 
 pub mod announce;
+pub mod chat;
 pub mod config_cmd;
 pub mod connect;
 pub mod daemon_cmd;
 pub mod discover;
+pub mod friend;
 pub mod identity;
 pub mod peers;
+pub mod ping;
 pub mod send;
 pub mod status;

@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod config;
 pub mod daemon;
+pub mod friends;
 pub mod gossip;
 pub mod identity;
 pub mod node;

@@ -204,6 +204,113 @@ impl HumanDisplay for DaemonStatusOutput {
     }
 }
 
+/// Friend add/remove output.
+#[derive(Serialize)]
+pub struct FriendAddOutput {
+    pub status: String,
+    pub node_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+}
+
+impl HumanDisplay for FriendAddOutput {
+    fn human_print(&self) {
+        let display = self
+            .alias
+            .as_deref()
+            .unwrap_or(&self.node_id[..16.min(self.node_id.len())]);
+        println!("{}: {display}", self.status);
+    }
+}
+
+/// Single friend entry for list output.
+#[derive(Serialize)]
+pub struct FriendEntry {
+    pub node_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    pub added_at: u64,
+}
+
+/// Friend list output.
+#[derive(Serialize)]
+pub struct FriendListOutput {
+    pub friends: Vec<FriendEntry>,
+    pub count: usize,
+}
+
+impl HumanDisplay for FriendListOutput {
+    fn human_print(&self) {
+        if self.friends.is_empty() {
+            println!("No friends added");
+            return;
+        }
+        println!("Friends ({}):", self.count);
+        for f in &self.friends {
+            let display = f
+                .alias
+                .as_deref()
+                .unwrap_or(&f.node_id[..16.min(f.node_id.len())]);
+            println!("  {} ({})", display, &f.node_id[..16.min(f.node_id.len())]);
+        }
+    }
+}
+
+/// Single ping result.
+#[derive(Serialize)]
+pub struct PingResult {
+    pub seq: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rtt_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Summary statistics for a ping run.
+#[derive(Serialize)]
+pub struct PingSummary {
+    pub transmitted: u32,
+    pub received: u32,
+    pub loss_percent: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avg_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_ms: Option<f64>,
+}
+
+/// Ping output.
+#[derive(Serialize)]
+pub struct PingOutput {
+    pub node_id: String,
+    pub results: Vec<PingResult>,
+    pub summary: PingSummary,
+}
+
+impl HumanDisplay for PingOutput {
+    fn human_print(&self) {
+        for r in &self.results {
+            if let Some(rtt) = r.rtt_ms {
+                println!("ping seq={} rtt={rtt:.1}ms", r.seq);
+            } else if let Some(err) = &r.error {
+                println!("ping seq={} error: {err}", r.seq);
+            }
+        }
+        let id_short = &self.node_id[..16.min(self.node_id.len())];
+        println!("--- {id_short} ping statistics ---");
+        println!(
+            "{} transmitted, {} received, {:.0}% loss",
+            self.summary.transmitted, self.summary.received, self.summary.loss_percent
+        );
+        if let (Some(min), Some(avg), Some(max)) =
+            (self.summary.min_ms, self.summary.avg_ms, self.summary.max_ms)
+        {
+            println!("rtt min/avg/max = {min:.1}/{avg:.1}/{max:.1} ms");
+        }
+    }
+}
+
 /// Config output.
 #[derive(Serialize)]
 pub struct ConfigOutput {
