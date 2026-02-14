@@ -1,6 +1,5 @@
 use anyhow::Result;
 use serde_json::json;
-use std::collections::HashMap;
 
 use crate::identity;
 
@@ -11,7 +10,8 @@ pub async fn register(
     capabilities: Vec<String>,
     json_output: bool,
 ) -> Result<()> {
-    let (node_id, _) = identity::load_or_generate()?;
+    let secret_key = identity::load_or_generate()?;
+    let node_id = secret_key.public().to_string();
     let bot_name = name.unwrap_or_else(|| format!("clawnet-{}", &node_id[..8]));
     let caps = if capabilities.is_empty() {
         vec!["chat".to_string(), "openclaw".to_string()]

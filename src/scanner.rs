@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 
-use crate::discovery::{self, ScanResponse};
+use crate::discovery;
 use crate::protocol::PeerInfo;
 use crate::store;
 
