@@ -47,7 +47,7 @@ pub async fn run(interval_secs: u64) -> Result<()> {
     let quic_port = node
         .endpoint
         .bound_sockets()
-        .next()
+        .first()
         .map(|a| a.port())
         .unwrap_or(0);
 

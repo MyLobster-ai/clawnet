@@ -35,6 +35,7 @@ pub fn set(key: &str, value: &str, json: bool) -> Result<()> {
                 openclaw_version: cfg.openclaw_version,
                 mode: cfg.mode,
                 metadata: cfg.metadata,
+                discovery_port: cfg.discovery_port,
             },
             true,
         );
